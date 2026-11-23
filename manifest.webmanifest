@@ -1,0 +1,13 @@
+{
+  "name": "Scanner Absensi QR – SMK Muhammadiyah 1 Sukabumi",
+  "short_name": "Scanner Absensi",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f2faf6",
+  "theme_color": "#0b5f4a",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
