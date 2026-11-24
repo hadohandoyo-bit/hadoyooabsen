@@ -70,7 +70,7 @@ main{flex:1;display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);ga
 .res .msg{color:var(--ink);font-weight:700;font-size:16px;margin-top:8px}
 .lat{display:inline-flex;gap:6px;margin-top:8px;flex-wrap:wrap}
 .lat span{font-size:12px;font-weight:700;padding:2px 9px;border-radius:99px;background:rgba(0,0,0,.06);font-variant-numeric:tabular-nums}
-.cnt{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+.cnt{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}.mode{display:flex;gap:6px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:4px;margin-bottom:10px}.mode button{flex:1;border:0;background:transparent;font:inherit;font-weight:700;font-size:14px;padding:10px 6px;border-radius:10px;color:var(--mut);cursor:pointer;min-height:44px}.mode button.on{background:var(--g,#0f9d78);color:#fff}.jd{font-size:13px;color:var(--mut);margin:0 0 10px;line-height:1.5}.jd b{color:var(--ink,#123)}
 .cnt div{text-align:center;padding:10px 6px;background:#fff;border:1px solid var(--line);border-radius:14px}
 .cnt b{display:block;font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}.cnt span{font-size:12px;color:var(--mut);font-weight:600}
 .card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--sh);padding:16px}
@@ -149,8 +149,10 @@ label.f{display:block;font-weight:700;font-size:13px;margin:0 0 6px}
       <div class="card" style="margin-top:12px"><label class="f" for="usb">Scanner USB / ketik manual</label><input class="in" id="usb" placeholder="Fokuskan di sini lalu scan dengan alat scanner USB…" autocomplete="off"></div>
     </div>
     <div>
+      <div class="mode" id="modeSeg" role="group" aria-label="Mode scan"><button data-m="auto" class="on">Otomatis</button><button data-m="masuk">Masuk</button><button data-m="pulang">Pulang</button></div>
+      <div class="jd" id="jd"></div>
       <div class="res" id="res" aria-live="polite"></div>
-      <div class="cnt"><div><b id="cT">0</b><span>Siswa aktif</span></div><div><b id="cD" style="color:var(--g)">0</b><span>Sudah absen</span></div><div><b id="cB" style="color:var(--red)">0</b><span>Belum</span></div></div>
+      <div class="cnt"><div><b id="cT">0</b><span>Siswa aktif</span></div><div><b id="cD" style="color:var(--g)">0</b><span>Sudah masuk</span></div><div><b id="cB" style="color:var(--red)">0</b><span>Belum masuk</span></div><div><b id="cP" style="color:#d99a00">0</b><span>Sudah pulang</span></div></div>
       <div class="card"><h3><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Scan terbaru</h3><div id="recent"></div></div>
     </div>
   </main>
@@ -205,18 +207,29 @@ let INFO=null,R={},done={},queue=[],entries=[],seq=Date.now(),flushBusy=false,fl
 try{queue=JSON.parse(LS.get('sc_q')||'[]')}catch(e){queue=[]}
 const saveQ=()=>LS.set('sc_q',JSON.stringify(queue));
 let soundOn=LS.get('sc_snd')!=='0';
+let mode=LS.get('sc_mode')||'auto';
+const hm5=()=>nowJ().time.slice(0,5);
+function jdw(k){const J=INFO&&INFO.jadwal&&INFO.jadwal[k];if(J)return J;const m=(INFO&&INFO.jamMasuk)||'07:00',p=(INFO&&INFO.jamPulang)||'15:00';return{m:m,t:(INFO&&INFO.batasTelat)||m,p:p,pm:'13:30',nm:'Jadwal dasar',k:0}}
+function paintJadwal(){
+  const el=$('#jd');if(!INFO||!el)return;const g={};
+  Object.keys(INFO.jadwal||{}).forEach(k=>{const j=INFO.jadwal[k],sig=[j.nm,j.m,j.t,j.p,j.pm].join('|');(g[sig]=g[sig]||{j:j,k:[]}).k.push(k)});
+  const a=Object.keys(g).map(x=>g[x]).sort((x,y)=>y.k.length-x.k.length);
+  el.innerHTML=a.length?a.slice(0,4).map(x=>`<div>${x.j.k?'⭐ ':''}<b>${esc(x.j.nm)}</b>${a.length>1?' ('+(x.k.length>3?x.k.length+' kelas':esc(x.k.join(', ')))+')':''}: masuk <b>${esc(x.j.m)}</b> · telat &gt;${esc(x.j.t)} · pulang <b>${esc(x.j.p)}</b> (scan ≥ ${esc(x.j.pm)})</div>`).join('')+(a.length>4?'<div>…dan jadwal lain</div>':''):'';
+}
+function setMode(m){mode=m;LS.set('sc_mode',m);document.querySelectorAll('#modeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.m===m))}
+$('#modeSeg').onclick=e=>{const b=e.target.closest('button');if(b)setMode(b.dataset.m)};setMode(mode);
 
 function applyInfo(d){
   INFO=d;R={};d.siswa.forEach(s=>R[s.n]=s);
   done=Object.assign({},d.done);
-  queue.forEach(q=>{if(q.nis&&!done[q.nis])done[q.nis]={s:q.st||'?',j:q.jam||''}});
+  queue.forEach(q=>{if(!q.nis)return;if(q.aksi==='pulang')done[q.nis]=Object.assign({s:'H',j:''},done[q.nis]||{},{jp:q.jam,sp:q.sp});else if(!done[q.nis])done[q.nis]={s:q.st||'?',j:q.jam||''}});
   $('#school').textContent=d.sekolah||'';
-  counts();
+  counts();paintJadwal();
 }
 async function loadInfo(){
   const d=await api('scanInfo');applyInfo(d);LS.set('sc_info',JSON.stringify(d));setNet(true);return d;
 }
-function counts(){const t=INFO?INFO.siswa.length:0,d=Object.keys(done).length;$('#cT').textContent=t;$('#cD').textContent=d;$('#cB').textContent=Math.max(0,t-d)}
+function counts(){const t=INFO?INFO.siswa.length:0,ks=Object.keys(done),d=ks.filter(k=>done[k].j||'HTD?'.includes(done[k].s)&&!done[k].jp).length,pl=ks.filter(k=>done[k].jp).length;$('#cT').textContent=t;$('#cD').textContent=ks.filter(k=>done[k].j||(done[k].s==='?')).length;$('#cB').textContent=Math.max(0,t-ks.length);$('#cP').textContent=pl}
 
 /* ---------- suara ---------- */
 let ac=null;
@@ -228,17 +241,18 @@ function beep(k){
 
 /* ---------- tampilan hasil ---------- */
 function showRes(e){
-  const cls=e.state==='err'?'bad':e.state==='dup'?'dup':e.status==='T'?'late':'ok';
+  const pl=e.aksi==='pulang';
+  const cls=e.state==='err'?'bad':e.state==='dup'?'dup':pl?(e.sp==='PA'?'late':'ok'):e.status==='T'?'late':'ok';
   const icon=cls==='bad'?'✕':cls==='dup'?'✓✓':cls==='late'?'!':'✓';
-  const msg=cls==='bad'?esc(e.err||'Gagal'):cls==='dup'?`Sudah absen${e.jam?' pukul '+e.jam.slice(0,5):''}`:cls==='late'?'Terlambat. Semoga besok lebih awal ya 🤲':'Hadir tepat waktu. Selamat belajar! 🌙';
+  const msg=cls==='bad'?esc(e.err||'Gagal'):cls==='dup'?(pl?`Sudah absen pulang${e.jam?' pukul '+e.jam.slice(0,5):''}`:`Sudah absen masuk${e.jam?' pukul '+e.jam.slice(0,5):''}${e.hint?' · '+esc(e.hint):''}`):pl?(e.sp==='PA'?'Pulang lebih awal dari jadwal. Hati-hati di jalan 🤲':'Selamat pulang. Hati-hati di jalan! 🌙'):cls==='late'?'Terlambat. Semoga besok lebih awal ya 🤲':'Hadir tepat waktu. Selamat belajar! 🌙';
   const r=$('#res');r.className='res '+cls+' pop';
-  r.innerHTML=`<div class="big">${icon}</div><div style="min-width:0"><h2>${esc(e.nama||'Tidak dikenal')}</h2><p>${e.kelas?esc(e.kelas)+' · ':''}${e.jam?e.jam.slice(0,5):''}</p><div class="msg">${msg}</div><div class="lat">${e.ms!=null?`<span>⚡ terbaca ${Math.round(e.ms)} ms</span>`:''}${e.sync?`<span>☁ ${e.sync==='wait'?'menyimpan…':'tersimpan '+Math.round(e.sync)+' ms'}</span>`:''}</div></div>`;
+  r.innerHTML=`<div class="big">${icon}</div><div style="min-width:0"><h2>${esc(e.nama||'Tidak dikenal')}</h2><p>${e.kelas?esc(e.kelas)+' · ':''}${e.jam?e.jam.slice(0,5):''}${pl?' · PULANG':e.state==='err'?'':' · MASUK'}</p><div class="msg">${msg}</div><div class="lat">${e.ms!=null?`<span>⚡ terbaca ${Math.round(e.ms)} ms</span>`:''}${e.sync?`<span>☁ ${e.sync==='wait'?'menyimpan…':'tersimpan '+Math.round(e.sync)+' ms'}</span>`:''}</div></div>`;
   const cam=$('#cam');cam.className='cam '+cls;
   clearTimeout(idleT);idleT=setTimeout(idle,6000);
 }
 function idle(){const r=$('#res');r.className='res';r.innerHTML=`<div class="big">${ic('scan')}</div><div><h2>Siap memindai</h2><p>Dekatkan QR di kartu siswa ke kamera.</p></div>`;$('#cam').className='cam'}
 function paintRecent(){
-  $('#recent').innerHTML=entries.length?entries.slice(0,20).map(e=>`<div class="li"><div class="av" style="${e.state==='err'?'background:linear-gradient(145deg,#ffb4b8,#e5484d);color:#fff':''}">${initials(e.nama)}</div><div class="tx"><b>${esc(e.nama||'Tidak dikenal')}</b><span>${e.kelas?esc(e.kelas)+' · ':''}${e.jam?e.jam.slice(0,5):''}${e.state==='err'?' · '+esc(e.err):''}</span></div>${e.state==='err'?'<span class="b red">Gagal</span>':e.state==='dup'?'<span class="b blue">Sudah absen</span>':e.sync==='wait'?'<span class="b slate">Menyimpan…</span>':`<span class="b ${e.status==='T'?'gold':''}">${esc(STN[e.status]||'')}</span>`}</div>`).join(''):'<div class="empty">Belum ada scan.</div>';
+  $('#recent').innerHTML=entries.length?entries.slice(0,20).map(e=>`<div class="li"><div class="av" style="${e.state==='err'?'background:linear-gradient(145deg,#ffb4b8,#e5484d);color:#fff':''}">${initials(e.nama)}</div><div class="tx"><b>${esc(e.nama||'Tidak dikenal')}</b><span>${e.kelas?esc(e.kelas)+' · ':''}${e.jam?e.jam.slice(0,5):''}${e.aksi?' · '+e.aksi:''}${e.state==='err'?' · '+esc(e.err):''}</span></div>${e.state==='err'?'<span class="b red">Gagal</span>':e.state==='dup'?'<span class="b blue">Sudah absen</span>':e.sync==='wait'?'<span class="b slate">Menyimpan…</span>':e.aksi==='pulang'?`<span class="b ${e.sp==='PA'?'gold':''}">${e.sp==='PA'?'Pulang awal':'Pulang'}</span>`:`<span class="b ${e.status==='T'?'gold':''}">${esc(STN[e.status]||'')}</span>`}</div>`).join(''):'<div class="empty">Belum ada scan.</div>';
 }
 function setNet(ok){const n=$('#net');n.className='net'+(ok?'':' off');n.textContent=(ok?'● Tersambung':'● Offline')+(queue.length?` · ${queue.length} antre`:'')}
 function banner(msg){const b=$('#banner');if(msg){b.textContent=msg;b.classList.remove('hide')}else b.classList.add('hide')}
@@ -251,22 +265,32 @@ function handleCode(raw,decodeMs){
   if(!m){const e={nama:'QR tidak dikenal',state:'err',err:'Bukan kartu absensi sekolah',jam:nowJ().time,ms:decodeMs};entries.unshift(e);showRes(e);paintRecent();beep('bad');return}
   const nis=m[1],tok=m[2],s=R[nis];
   if(INFO&&(!s||s.t!==tok)){const e={nama:s?s.nm:'Kartu tidak valid',kelas:s?s.k:'',state:'err',err:s?'QR tidak cocok (kartu palsu / lama)':'Siswa tidak terdaftar / nonaktif',jam:nowJ().time,ms:decodeMs};entries.unshift(e);showRes(e);paintRecent();beep('bad');return}
-  if(done[nis]){const d=done[nis];showRes({nama:s?s.nm:nis,kelas:s?s.k:'',state:'dup',jam:d.j,status:d.s,ms:decodeMs});beep('dup');return}
-  const j=nowJ(),st=INFO&&j.time.slice(0,5)>INFO.batasTelat?'T':'H';
-  const e={id:++seq,nis:nis,nama:s?s.nm:'Memproses…',kelas:s?s.k:'',jam:j.time,status:st,state:'ok',ms:decodeMs,sync:'wait',t0:t0};
-  done[nis]={s:st,j:j.time};entries.unshift(e);counts();showRes(e);paintRecent();beep(st==='T'?'late':'ok');
-  queue.push({id:e.id,p:raw,ts:Date.now(),nis:nis,st:st,jam:j.time});saveQ();setNet(navigator.onLine);flush();
+  const J=jdw(s?s.k:''),dn=done[nis],hm=hm5(),j=nowJ();
+  let aksi='masuk',dup=false,hint='';
+  if(!dn){aksi=mode==='pulang'?'pulang':'masuk'}
+  else if(!('HTD?'.includes(dn.s))){dup=true}
+  else if(dn.jp){dup=true;aksi='pulang'}
+  else if(mode==='masuk'){dup=true}
+  else if(mode==='pulang'||hm>=J.pm){aksi='pulang'}
+  else{dup=true;hint='pulang mulai '+J.pm}
+  if(dup){showRes({nama:s?s.nm:nis,kelas:s?s.k:'',state:'dup',aksi:aksi,jam:aksi==='pulang'?dn.jp:dn.j,hint:hint,ms:decodeMs});beep('dup');return}
+  const e={id:++seq,nis:nis,nama:s?s.nm:'Memproses…',kelas:s?s.k:'',jam:j.time,aksi:aksi,state:'ok',ms:decodeMs,sync:'wait',t0:t0};
+  let st='H',sp='';
+  if(aksi==='masuk'){st=hm>J.t?'T':'H';e.status=st;done[nis]={s:st,j:j.time}}
+  else{sp=hm>=J.p?'P':'PA';e.sp=sp;e.status='H';done[nis]=Object.assign({s:'H',j:''},dn||{},{jp:j.time,sp:sp})}
+  entries.unshift(e);counts();showRes(e);paintRecent();beep(aksi==='masuk'?(st==='T'?'late':'ok'):(sp==='PA'?'late':'ok'));
+  queue.push({id:e.id,p:raw,ts:Date.now(),nis:nis,st:st,jam:j.time,aksi:aksi,sp:sp,mode:mode});saveQ();setNet(navigator.onLine);flush();
 }
 async function flush(){
   if(flushBusy||!queue.length)return;flushBusy=true;clearTimeout(flushT);flushT=null;
   const batch=queue.slice(0,25),ts=performance.now();
   try{
-    const out=await api('scanBatch',{items:batch.map(q=>({id:q.id,p:q.p,ts:q.ts}))});
+    const out=await api('scanBatch',{items:batch.map(q=>({id:q.id,p:q.p,ts:q.ts,mode:q.aksi||'auto'}))});
     const ms=performance.now()-ts;
     queue=queue.filter(q=>!batch.some(b=>b.id===q.id));saveQ();
     out.forEach(r=>{
       const e=entries.find(x=>x.id===r.id);
-      if(r.ok){if(r.nis)done[r.nis]={s:r.status,j:r.jam};if(e){e.status=r.status;e.jam=r.jam;e.state=r.dup?'dup':'ok';e.sync=ms;if(r.nama)e.nama=r.nama;if(r.kelas)e.kelas=r.kelas}}
+      if(r.ok){if(r.nis)done[r.nis]={s:r.status,j:r.jam,jp:r.jam_pulang,sp:r.status_pulang};if(e){e.aksi=r.aksi;e.sp=r.status_pulang;e.status=r.status;e.jam=r.aksi==='pulang'?r.jam_pulang:r.jam;e.state=r.dup?'dup':'ok';e.sync=ms;if(r.nama)e.nama=r.nama;if(r.kelas)e.kelas=r.kelas}}
       else{const n=(e&&e.nis)||r.nis;if(n)delete done[n];if(e){e.state='err';e.err=r.err;e.sync=0;if(r.nama)e.nama=r.nama}beep('bad');toast((e?e.nama+': ':'')+r.err,'err')}
     });
     if(entries[0]&&entries[0].id)showRes(entries[0]);
