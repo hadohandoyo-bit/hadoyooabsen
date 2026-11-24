@@ -34,6 +34,9 @@ svg.ic{width:1.15em;height:1.15em;flex:none;fill:none;stroke:currentColor;stroke
 .clock small{display:block}
 .ibtn{width:40px;height:40px;border-radius:12px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1);color:#fff;display:grid;place-items:center;cursor:pointer}
 .ibtn:hover{background:rgba(255,255,255,.2)}
+.ibtn.out{background:rgba(229,72,77,.28);border-color:rgba(255,160,165,.5)}.ibtn.out:hover{background:rgba(229,72,77,.5)}
+.tools{display:flex;gap:8px;align-items:center}
+body.setup .tools{display:none}
 .ibtn.on{background:var(--gold);color:#4a3200;border-color:var(--gold)}
 main{flex:1;display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px;padding:18px;max-width:1280px;width:100%;margin:0 auto}
 .cam{position:relative;background:#06231c;border-radius:22px;overflow:hidden;box-shadow:var(--sh);aspect-ratio:4/3;max-height:calc(100dvh - 190px);width:100%;justify-self:center}
@@ -100,7 +103,7 @@ label.f{display:block;font-weight:700;font-size:13px;margin:0 0 6px}
  .res{padding:16px}.res .big{width:62px;height:62px;font-size:30px}
  .bar{padding:8px 12px}.bar small{display:none}.clock b{font-size:20px}
 }
-@media(max-width:520px){.bar{gap:8px;padding:8px 10px}.bar .logo-m,.bar>div:nth-child(2),#bFull{display:none}.ibtn{width:38px;height:38px}.clock{margin-left:0}.net{font-size:11px;padding:3px 8px;max-width:128px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.net{margin-left:auto}}
+@media(max-width:520px){.bar{gap:8px 10px;padding:8px 10px;flex-wrap:wrap}.bar .logo-m,.bar>div:nth-child(2){display:none}.clock{margin-left:0}.net{font-size:11px;padding:3px 8px;margin-left:auto;white-space:nowrap}.tools{flex:1 1 100%;justify-content:space-between}.ibtn{width:42px;height:42px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 </style>
 </head>
@@ -112,11 +115,15 @@ label.f{display:block;font-weight:700;font-size:13px;margin:0 0 6px}
     <div><b>Scanner Absensi QR</b><small id="school">SMK Muhammadiyah 1 Kota Sukabumi</small></div>
     <div class="clock"><b id="clock">--:--:--</b><small id="date"></small></div>
     <span class="net" id="net">● …</span>
-    <button class="ibtn" id="bSnd" title="Bunyi &amp; getar" aria-label="Bunyi dan getar"></button>
-    <button class="ibtn hide" id="bTorch" title="Senter" aria-label="Senter"></button>
-    <button class="ibtn" id="bFlip" title="Ganti kamera" aria-label="Ganti kamera"></button>
-    <button class="ibtn" id="bFull" title="Layar penuh" aria-label="Layar penuh"></button>
-    <button class="ibtn" id="bCfg" title="Pengaturan" aria-label="Pengaturan"></button>
+    <div class="tools">
+      <button class="ibtn" id="bSnd" title="Bunyi &amp; getar" aria-label="Bunyi dan getar"></button>
+      <button class="ibtn hide" id="bTorch" title="Senter" aria-label="Senter"></button>
+      <button class="ibtn" id="bFlip" title="Ganti kamera" aria-label="Ganti kamera"></button>
+      <button class="ibtn" id="bCam" title="Matikan kamera" aria-label="Matikan atau nyalakan kamera"></button>
+      <button class="ibtn" id="bFull" title="Layar penuh" aria-label="Layar penuh"></button>
+      <button class="ibtn" id="bCfg" title="Pengaturan" aria-label="Pengaturan"></button>
+      <button class="ibtn out" id="bOut" title="Keluar" aria-label="Keluar"></button>
+    </div>
   </header>
 
   <!-- konfigurasi awal -->
@@ -162,7 +169,7 @@ label.f{display:block;font-weight:700;font-size:13px;margin:0 0 6px}
 const $=s=>document.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
-const IC={snd:'<path d="M4 9v6h4l5 4V5L8 9zM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',mute:'<path d="M4 9v6h4l5 4V5L8 9zM17 9l5 6M22 9l-5 6"/>',torch:'<path d="M9 2h6l-1 7h-4zM10 9v5l-2 8h8l-2-8V9"/>',flip:'<path d="M20 11a8 8 0 0 0-14.5-4M4 4v4h4M4 13a8 8 0 0 0 14.5 4M20 20v-4h-4"/>',full:'<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',scan:'<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/>'};
+const IC={snd:'<path d="M4 9v6h4l5 4V5L8 9zM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',mute:'<path d="M4 9v6h4l5 4V5L8 9zM17 9l5 6M22 9l-5 6"/>',torch:'<path d="M9 2h6l-1 7h-4zM10 9v5l-2 8h8l-2-8V9"/>',flip:'<path d="M20 11a8 8 0 0 0-14.5-4M4 4v4h4M4 13a8 8 0 0 0 14.5 4M20 20v-4h-4"/>',full:'<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',camoff:'<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13.5" r="3.5"/><path d="M3 3l18 18"/>',cam:'<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13.5" r="3.5"/>',out:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',scan:'<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/>'};
 const ic=n=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
 const initials=n=>String(n||'?').replace(/[^A-Za-z ]/g,'').trim().split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase()||'?';
 const STN={H:'Hadir',T:'Terlambat',S:'Sakit',I:'Izin',A:'Alpa',D:'Dispensasi'};
@@ -315,7 +322,7 @@ async function startCam(){
     vid.srcObject=stream;await vid.play();track=stream.getVideoTracks()[0];
     try{const caps=track.getCapabilities?track.getCapabilities():{};if(caps.focusMode&&caps.focusMode.includes('continuous'))await track.applyConstraints({advanced:[{focusMode:'continuous'}]});$('#bTorch').classList.toggle('hide',!caps.torch)}catch(e){}
     if(!detector)detector=await makeDetector();
-    running=true;$('#camOff').classList.add('hide');schedule();keepAwake();
+    running=true;$('#camOff').classList.add('hide');schedule();keepAwake();setCamBtn();
   }catch(e){
     stopCam();$('#camOff').classList.remove('hide');$('#bStart').classList.remove('hide');
     const nm=e&&e.name;$('#offT').textContent=nm==='NotAllowedError'?'Izin kamera ditolak':nm==='NotFoundError'?'Kamera tidak ditemukan':'Kamera gagal diaktifkan';
@@ -323,16 +330,17 @@ async function startCam(){
     $('#bStart').textContent='Coba lagi';
   }
 }
-function stopCam(){running=false;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}vid.srcObject=null;track=null}
+function setCamBtn(){const b=$('#bCam');if(!b)return;b.innerHTML=ic(running?'cam':'camoff');b.title=running?'Matikan kamera':'Nyalakan kamera';b.classList.toggle('on',!running)}
+function stopCam(){running=false;if(wl){try{wl.release()}catch(e){}wl=null}if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}vid.srcObject=null;track=null;setCamBtn()}
 let wl=null;async function keepAwake(){try{if('wakeLock' in navigator)wl=await navigator.wakeLock.request('screen')}catch(e){}}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(running)keepAwake();if(queue.length)flush()}});
 
 /* ---------- UI ---------- */
-function paintBtns(){$('#bSnd').innerHTML=ic(soundOn?'snd':'mute');$('#bTorch').innerHTML=ic('torch');$('#bFlip').innerHTML=ic('flip');$('#bFull').innerHTML=ic('full');$('#bCfg').innerHTML=ic('gear')}
+function paintBtns(){$('#bSnd').innerHTML=ic(soundOn?'snd':'mute');$('#bTorch').innerHTML=ic('torch');$('#bFlip').innerHTML=ic('flip');$('#bFull').innerHTML=ic('full');$('#bCfg').innerHTML=ic('gear');$('#bOut').innerHTML=ic('out');setCamBtn()}
 function tick(){const j=nowJ(),d=new Date();$('#clock').textContent=j.time;$('#date').textContent=`${HARI[new Date(j.date+'T12:00:00Z').getUTCDay()]}, ${+j.date.slice(8)} ${BLN[+j.date.slice(5,7)-1]} ${j.date.slice(0,4)}`;
   if(INFO&&j.date!==INFO.tanggal&&!tick.busy){tick.busy=1;loadInfo().catch(()=>{}).finally(()=>tick.busy=0)}}
-function showSetup(msg){$('#main').classList.add('hide');$('#setup').classList.remove('hide');$('#sU').value=CFG.u;$('#sK').value=CFG.k;if(msg){$('#sErr').textContent=msg;$('#sErr').classList.remove('hide')}}
-function showMain(){$('#setup').classList.add('hide');$('#main').classList.remove('hide');idle();paintRecent();setNet(navigator.onLine)}
+function showSetup(msg){document.body.classList.add('setup');$('#main').classList.add('hide');$('#setup').classList.remove('hide');$('#sU').value=CFG.u;$('#sK').value=CFG.k;if(msg){$('#sErr').textContent=msg;$('#sErr').classList.remove('hide')}}
+function showMain(){document.body.classList.remove('setup');$('#setup').classList.add('hide');$('#main').classList.remove('hide');idle();paintRecent();setNet(navigator.onLine)}
 function dlg(html){const o=document.createElement('div');o.className='mo';o.innerHTML=`<div class="md">${html}</div>`;o.onmousedown=e=>{if(e.target===o)o.remove()};$('#layer').appendChild(o);return o}
 
 $('#sGo').onclick=async()=>{
@@ -346,13 +354,27 @@ $('#bSnd').onclick=()=>{soundOn=!soundOn;LS.set('sc_snd',soundOn?'1':'0');paintB
 $('#bFlip').onclick=async()=>{facing=facing==='environment'?'user':'environment';LS.set('sc_face',facing);stopCam();await startCam()};
 $('#bTorch').onclick=async()=>{try{torchOn=!torchOn;await track.applyConstraints({advanced:[{torch:torchOn}]});$('#bTorch').classList.toggle('on',torchOn)}catch(e){torchOn=false;toast('Senter tidak didukung','err')}};
 $('#bFull').onclick=()=>{try{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()}catch(e){}};
-$('#bStart').onclick=startCam;
+$('#bStart').onclick=()=>startCam();
+$('#bCam').onclick=async()=>{
+  if(!CFG.u)return;
+  if(running||stream){stopCam();$('#camOff').classList.remove('hide');$('#offT').textContent='Kamera dimatikan';$('#offS').textContent='Scanner USB tetap bisa dipakai. Tekan tombol di bawah untuk menyalakan kamera lagi.';$('#bStart').textContent='Nyalakan kamera';$('#bStart').classList.remove('hide');$('#hud').textContent='';idle()}
+  else await startCam();
+  setCamBtn();
+};
+function doLogout(){
+  stopCam();LS.del('sc_u');LS.del('sc_k');LS.del('sc_info');CFG={u:'',k:''};INFO=null;R={};done={};entries=[];
+  showSetup();toast('Anda sudah keluar. Kamera dimatikan.');
+}
+$('#bOut').onclick=()=>{
+  const o=dlg(`<h3 style="margin:0 0 8px;font-size:18px">Keluar dari scanner?</h3><p style="margin:0 0 16px;color:var(--mut);font-size:14px">Kamera akan dimatikan dan kunci dihapus dari perangkat ini.${queue.length?` <b style="color:var(--ink)">${queue.length} scan belum terkirim</b> tetap tersimpan dan akan terkirim saat Anda masuk lagi.`:''}</p><div style="display:grid;gap:10px"><button class="btn danger" id="oY">Ya, keluar</button><button class="btn ghost" id="oN">Batal</button></div>`);
+  o.querySelector('#oN').onclick=()=>o.remove();o.querySelector('#oY').onclick=()=>{o.remove();doLogout()};
+};
 $('#bCfg').onclick=()=>{
   const o=dlg(`<h3 style="margin:0 0 10px;font-size:18px">Pengaturan scanner</h3><p style="margin:0 0 6px;font-size:13px;color:var(--mut);word-break:break-all">Web App: ${esc(CFG.u)}</p><p style="margin:0 0 14px;font-size:13px;color:var(--mut)">Antrean belum terkirim: <b>${queue.length}</b></p><div style="display:grid;gap:10px"><button class="btn ghost" id="dSync">Muat ulang data siswa</button><button class="btn ghost" id="dHud">Tampilkan/sembunyikan info teknis</button><button class="btn danger" id="dOut">Ganti konfigurasi / keluar</button><button class="btn" id="dX">Tutup</button></div>`);
   o.querySelector('#dX').onclick=()=>o.remove();
   o.querySelector('#dSync').onclick=async()=>{try{await loadInfo();toast('Data siswa diperbarui')}catch(e){toast(e.message,'err')}o.remove()};
   o.querySelector('#dHud').onclick=()=>{$('#hud').classList.toggle('hide');o.remove()};
-  o.querySelector('#dOut').onclick=()=>{if(queue.length&&!confirm('Masih ada '+queue.length+' scan belum terkirim. Tetap keluar?'))return;LS.del('sc_u');LS.del('sc_k');LS.del('sc_info');CFG={u:'',k:''};stopCam();o.remove();showSetup()};
+  o.querySelector('#dOut').onclick=()=>{o.remove();doLogout()};
 };
 const usb=$('#usb');usb.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();handleCode(usb.value,null);usb.value=''}};
 
